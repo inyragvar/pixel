@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+site/
+.eggs/
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test / coverage / type check
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Packaging / local installs
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Project runtime data
+logs/
+artifacts/
+runs/
+tmp/
+.cache/
+
+# SQLite / local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated outputs
+output/
+reports/
+
+# Optional model/index/cache data
+indexes/
+vector_store/
+embeddings_cache/
+
+# Tooling
+.tox/
+.nox/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# If you add frontend later
+node_modules/
+coverage/
+.next/
+dist-frontend/

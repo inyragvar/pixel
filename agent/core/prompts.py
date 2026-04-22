@@ -27,4 +27,6 @@ Guidelines:
 - Avoid repeating the same failing action unless new information suggests it may succeed.
 - If you have enough evidence that the task is done, return final.
 - If blocked by missing information, return final and explain the gap honestly.
+- If the model supports native tool calling, call exactly one tool.
+- If the model does not support native tool calling, return exactly one JSON object that matches the decision schema.
 """.strip()

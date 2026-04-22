@@ -22,16 +22,128 @@ class Executor:
         self.git = git
 
     def available_tools(self) -> List[str]:
+        return [tool["function"]["name"] for tool in self.tool_schemas()]
+
+    def tool_schemas(self) -> List[Dict[str, Any]]:
         return [
-            "list_files(path='.')",
-            "read_file(path)",
-            "search_code(query)",
-            "write_file(path, content)",
-            "replace_in_file(path, old, new, count=1)",
-            "append_file(path, content)",
-            "run_command(command)",
-            "git_status()",
-            "git_diff()",
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_files",
+                    "description": "List files under a path relative to the workspace.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Relative path, default '.'"}
+                        },
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_file",
+                    "description": "Read a UTF-8 text file from the workspace.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Relative file path to read"}
+                        },
+                        "required": ["path"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_code",
+                    "description": "Search code or text in the workspace with ripgrep-like matching.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Text or regex-like query"}
+                        },
+                        "required": ["query"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "write_file",
+                    "description": "Write content to a file, creating or replacing it.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                        "required": ["path", "content"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "replace_in_file",
+                    "description": "Replace text in a file for targeted edits.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "old": {"type": "string"},
+                            "new": {"type": "string"},
+                            "count": {"type": "integer", "minimum": 1},
+                        },
+                        "required": ["path", "old", "new"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "append_file",
+                    "description": "Append content to the end of a file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                        "required": ["path", "content"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "run_command",
+                    "description": "Run a safe workspace-local shell command for validation or inspection.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "command": {"type": "string", "description": "Single shell command to run"}
+                        },
+                        "required": ["command"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "git_status",
+                    "description": "Show git status for the workspace.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "git_diff",
+                    "description": "Show git diff for the workspace.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
         ]
 
     def run_tool(self, tool: str, args: Dict[str, Any]) -> Tuple[str, List[str], List[str]]:

@@ -49,6 +49,14 @@ class FakeProvider:
             return FinalAnswer(summary="Fallback summary")
         raise AssertionError("Unexpected schema")
 
+    def decide_action(self, *, system_prompt, messages, model, tools, decision_schema):
+        return self.generate(
+            system_prompt=system_prompt,
+            messages=messages,
+            model=model,
+            response_schema=decision_schema,
+        )
+
 
 def test_agent_loop_executes_tool_steps(tmp_path: Path) -> None:
     workspace = tmp_path

@@ -43,11 +43,12 @@ class AgentLoop:
             f"Current state:\n{self._build_transcript(state)}\n\n"
             "Return the single best next decision."
         )
-        return self.provider.generate(
+        return self.provider.decide_action(
             system_prompt=ACTION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
             model=self.model,
-            response_schema=AgentDecision,
+            tools=self.executor.tool_schemas(),
+            decision_schema=AgentDecision,
         )
 
     def _finalize_from_decision(self, decision: AgentDecision, state: AgentState) -> FinalAnswer:
@@ -87,7 +88,7 @@ class AgentLoop:
                     summary="Agent stopped because the model returned a tool decision without a tool.",
                     changed_files=sorted(set(state.changed_files)),
                     commands_run=state.commands_run,
-                    next_steps=["Retry with a model that supports structured outputs reliably."],
+                    next_steps=["Retry with a model that supports tool calling or JSON outputs more reliably."],
                 )
                 break
 

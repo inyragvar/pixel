@@ -176,6 +176,10 @@ Examples:
 ### 3. Run the agent
 
 ```bash
+export OPENAI_BASE_URL=http://192.168.1.238:1234/v1
+export OPENAI_API_KEY=dummy
+export OLLAMA_BASE_URL=http://192.168.1.238:11434
+
 dev-agent \
   --task "Inspect this repo and propose the best next change" \
   --provider lmstudio \

@@ -107,6 +107,7 @@ class AgentLoop:
                     tool_action.args,
                 )
                 state.changed_files.extend(changed_files)
+                state.tracked_files = self.executor.filesystem.tracked_changes()
                 state.commands_run.extend(commands_run)
                 state.history.append(f"STEP {step_number} OBSERVATION:\n{result[-12000:]}")
             except Exception as exc:  # noqa: BLE001

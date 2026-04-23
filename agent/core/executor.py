@@ -16,6 +16,9 @@ class Executor:
         "write_file": {"required": ["path", "content"], "allowed": {"path", "content"}},
         "replace_in_file": {"required": ["path", "old", "new"], "allowed": {"path", "old", "new", "count"}},
         "append_file": {"required": ["path", "content"], "allowed": {"path", "content"}},
+        "apply_patch": {"required": ["patch"], "allowed": {"patch"}},
+        "rollback_file": {"required": ["path"], "allowed": {"path"}},
+        "rollback_all": {"required": [], "allowed": set()},
         "run_command": {"required": ["command"], "allowed": {"command"}},
         "git_status": {"required": [], "allowed": set()},
         "git_diff": {"required": [], "allowed": set()},
@@ -129,6 +132,42 @@ class Executor:
             {
                 "type": "function",
                 "function": {
+                    "name": "apply_patch",
+                    "description": "Apply a unified diff patch to one or more text files. Prefer this for multi-line edits.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "patch": {"type": "string", "description": "Unified diff patch text"},
+                        },
+                        "required": ["patch"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "rollback_file",
+                    "description": "Restore one tracked file to its original content from the start of this run.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                        },
+                        "required": ["path"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "rollback_all",
+                    "description": "Restore all tracked file changes made during this run.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "run_command",
                     "description": "Run a safe workspace-local shell command for validation or inspection.",
                     "parameters": {
@@ -199,6 +238,16 @@ class Executor:
             changed_path = self.filesystem.append_file(args["path"], args["content"])
             changed_files = [changed_path]
             return f"Appended file: {changed_path}", changed_files, commands_run
+        if tool_name == "apply_patch":
+            changed_files = self.filesystem.apply_patch(args["patch"])
+            return "Applied patch to: " + ", ".join(changed_files), changed_files, commands_run
+        if tool_name == "rollback_file":
+            changed_path = self.filesystem.rollback_file(args["path"])
+            changed_files = [changed_path]
+            return f"Rolled back file: {changed_path}", changed_files, commands_run
+        if tool_name == "rollback_all":
+            changed_files = self.filesystem.rollback_all()
+            return "Rolled back tracked files: " + ", ".join(changed_files), changed_files, commands_run
         if tool_name == "run_command":
             command = args["command"]
             commands_run = [command]

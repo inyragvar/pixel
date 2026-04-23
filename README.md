@@ -28,6 +28,8 @@ Implemented now:
   - file listing and file reading
   - file writing and appending
   - targeted in-file replacement
+  - unified-diff patch application
+  - rollback of tracked file edits
   - code search via `rg`
   - safe shell command execution
   - git status and diff
@@ -35,7 +37,6 @@ Implemented now:
 - test coverage for loop flow, filesystem, repo map, and provider parsing
 
 Not implemented yet:
-- unified-diff patch application
 - Docker sandbox / isolated task workspace
 - approval gates for dangerous actions
 - streaming / resumable runs
@@ -88,7 +89,7 @@ The executor exposes:
 - available tool names
 - JSON tool schemas
 - tool dispatch
-- tracking of changed files and commands run
+- tracking of changed files, tracked originals, and commands run
 
 ---
 
@@ -213,6 +214,9 @@ This is enough to support early debugging and iteration on the agent loop.
 - `write_file(path, content)`
 - `append_file(path, content)`
 - `replace_in_file(path, old, new, count=1)`
+- `apply_patch(patch)`
+- `rollback_file(path)`
+- `rollback_all()`
 
 ### SearchTool
 - `search_code(query)`

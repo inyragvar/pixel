@@ -71,16 +71,16 @@ Still missing for a solid v1:
 ## Phase 2 — improve editing
 
 ### 4. Patch-first editing
-- [ ] add unified diff patch application tool
-- [ ] prefer patch application over full-file rewrite
-- [ ] keep `write_file` for new files or explicit full rewrites only
-- [ ] capture patch failures with precise error output
-- [ ] add tests for patch application edge cases
+- [x] add unified diff patch application tool
+- [x] prefer patch application over full-file rewrite
+- [x] keep `write_file` for new files or explicit full rewrites only
+- [x] capture patch failures with precise error output
+- [x] add tests for patch application and rollback flow
 
 ### 5. Safer file operations
 - [ ] add allowlist / denylist for editable paths
 - [ ] block binary file writes by default
-- [ ] add backup/rollback for file edits during one run
+- [x] add backup/rollback for file edits during one run
 - [ ] track before/after file hashes
 
 ---

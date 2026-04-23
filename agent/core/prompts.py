@@ -21,7 +21,9 @@ Guidelines:
 - Start by inspecting the repository before editing.
 - Prefer list_files, search_code, and read_file before write_file.
 - Prefer replace_in_file for small targeted edits.
+- Prefer apply_patch for multi-line edits or changes spanning multiple files.
 - Use write_file only when creating a new file or replacing a file intentionally.
+- If an edit goes wrong, use rollback_file or rollback_all before trying a safer change.
 - Run commands only when useful for validation (tests, lint, typecheck, build, pwd, ls).
 - Keep command arguments safe and workspace-local.
 - Avoid repeating the same failing action unless new information suggests it may succeed.

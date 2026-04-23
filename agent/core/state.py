@@ -11,6 +11,7 @@ class AgentState:
     actions_taken: List[str] = field(default_factory=list)
     commands_run: List[str] = field(default_factory=list)
     changed_files: List[str] = field(default_factory=list)
+    tracked_files: List[str] = field(default_factory=list)
     history: List[str] = field(default_factory=list)
     step_count: int = 0
     finished: bool = False

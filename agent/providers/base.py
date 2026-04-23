@@ -5,8 +5,15 @@ from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel
 
+from agent.providers.capabilities import ProviderCapabilities
+
 
 class Provider(ABC):
+    capabilities: ProviderCapabilities
+    provider_name: str
+    last_generate_mode: Optional[str] = None
+    last_decision_mode: Optional[str] = None
+
     @abstractmethod
     def generate(
         self,

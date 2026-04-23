@@ -43,13 +43,14 @@ class AgentLoop:
             f"Current state:\n{self._build_transcript(state)}\n\n"
             "Return the single best next decision."
         )
-        return self.provider.decide_action(
+        decision = self.provider.decide_action(
             system_prompt=ACTION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
             model=self.model,
             tools=self.executor.tool_schemas(),
             decision_schema=AgentDecision,
         )
+        return decision
 
     def _finalize_from_decision(self, decision: AgentDecision, state: AgentState) -> FinalAnswer:
         summary = decision.summary or "Agent stopped without a final summary."
@@ -76,6 +77,8 @@ class AgentLoop:
             state.step_count = step_number
             decision = self._decide(state)
             reasoning = decision.reasoning or ""
+            decision_mode = getattr(self.provider, "last_decision_mode", None) or "unknown"
+            state.history.append(f"STEP {step_number} DECISION_MODE: {decision_mode}")
             if decision.decision == "final":
                 state.finished = True
                 state.history.append(f"STEP {step_number} FINAL: {reasoning}")

@@ -17,6 +17,7 @@ This project is an early **v1 scaffold**.
 
 Implemented now:
 - provider abstraction for LM Studio / Ollama / OpenAI-compatible APIs
+- capability-aware provider config with explicit provider presets
 - bounded agent loop with action/observation history
 - planner + reviewer scaffolding
 - provider-level action generation with fallbacks:
@@ -37,7 +38,6 @@ Not implemented yet:
 - unified-diff patch application
 - Docker sandbox / isolated task workspace
 - approval gates for dangerous actions
-- provider-specific capability flags
 - streaming / resumable runs
 - semantic code index / embeddings
 - GitHub / PR / issue tracker integrations
@@ -65,9 +65,11 @@ CLI
 The provider layer hides differences between backends.
 
 Current behavior:
-1. try native tool calling if supported by the backend/model
-2. fall back to JSON schema response formatting if available
-3. fall back again to plain JSON text parsing
+1. use provider-specific capability flags
+2. try native tool calling if supported by the backend/model
+3. fall back to JSON schema response formatting if available
+4. fall back again to plain JSON text parsing
+5. repair malformed tool args when possible
 
 This makes the scaffold much more tolerant of local models that are inconsistent about strict schema following.
 
@@ -197,6 +199,7 @@ The current CLI flow returns:
 - changed files
 - commands run
 - recent agent history
+- provider decision mode per step
 
 This is enough to support early debugging and iteration on the agent loop.
 
@@ -224,6 +227,7 @@ Current safeguards:
 - timeout
 - output truncation
 - small denylist for obviously dangerous commands
+- tool arg validation before dispatch
 
 ### GitTool
 - `status()`
@@ -255,8 +259,8 @@ Run:
 
 ```bash
 python -m pytest -v
-python -m pytest tests/test_loop.py -v
-python -m pytest -k action
+python -m pytest tests/test_agent_loop.py -v
+python -m pytest -k provider
 ```
 
 Current tests cover:

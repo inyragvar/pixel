@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+from agent.providers.capabilities import ProviderCapabilities
+from agent.providers.config import ProviderConfig
 from agent.providers.openai_compatible import OpenAICompatibleProvider
 from agent.schemas.actions import AgentDecision
 
@@ -31,8 +33,19 @@ class _FakeClient:
         raise RuntimeError("beta parse unsupported")
 
 
-def _build_provider(completion) -> OpenAICompatibleProvider:
-    return OpenAICompatibleProvider(base_url="http://example.com/v1", api_key="dummy", client=_FakeClient(completion))
+def _build_provider(completion, *, capabilities: ProviderCapabilities | None = None) -> OpenAICompatibleProvider:
+    config = ProviderConfig(
+        name="lmstudio",
+        base_url="http://example.com/v1",
+        api_key="dummy",
+        capabilities=capabilities or ProviderCapabilities(
+            supports_native_tools=True,
+            supports_json_schema=True,
+            supports_beta_parse=False,
+            supports_streaming=True,
+        ),
+    )
+    return OpenAICompatibleProvider(config=config, client=_FakeClient(completion))
 
 
 def test_decide_action_parses_native_tool_call() -> None:
@@ -56,12 +69,13 @@ def test_decide_action_parses_native_tool_call() -> None:
     assert decision.tool.tool == "read_file"
     assert decision.tool.args == {"path": "main.py"}
     assert decision.tool.reasoning == "Inspect the file first."
+    assert provider.last_decision_mode == "native_tools"
 
 
-def test_decide_action_falls_back_to_json_in_text() -> None:
+def test_decide_action_repairs_stringified_tool_args() -> None:
     message = SimpleNamespace(
-        content='```json\n{"decision":"final","summary":"done","next_steps":[],"changed_files":[]}\n```',
-        tool_calls=[],
+        content="Inspect the file first.",
+        tool_calls=[_FakeToolCall("read_file", ' {"path": "main.py"} ')],
     )
     completion = SimpleNamespace(choices=[SimpleNamespace(message=message)])
     provider = _build_provider(completion)
@@ -74,5 +88,34 @@ def test_decide_action_falls_back_to_json_in_text() -> None:
         decision_schema=AgentDecision,
     )
 
+    assert decision.tool is not None
+    assert decision.tool.args == {"path": "main.py"}
+
+
+def test_decide_action_falls_back_to_json_in_text() -> None:
+    message = SimpleNamespace(
+        content='```json\n{"decision":"final","summary":"done","next_steps":[],"changed_files":[]}\n```',
+        tool_calls=[],
+    )
+    completion = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    provider = _build_provider(
+        completion,
+        capabilities=ProviderCapabilities(
+            supports_native_tools=False,
+            supports_json_schema=False,
+            supports_beta_parse=False,
+            supports_streaming=False,
+        ),
+    )
+
+    decision = provider.decide_action(
+        system_prompt="act",
+        messages=[{"role": "user", "content": "task"}],
+        model="fake-model",
+        tools=[],
+        decision_schema=AgentDecision,
+    )
+
     assert decision.decision == "final"
     assert decision.summary == "done"
+    assert provider.last_decision_mode == "json_text_fallback"

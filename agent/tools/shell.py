@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shlex
 import subprocess
 from pathlib import Path
 
@@ -20,12 +19,11 @@ class ShellTool:
         self.timeout = timeout
 
     def run_command(self, command: str) -> str:
-        normalized = command.strip()
+        normalized = " ".join(command.strip().split())
         for denied in self.DENYLIST:
             if denied in normalized:
                 raise ValueError(f"Blocked dangerous command pattern: {denied}")
 
-        subprocess.run(["bash", "-lc", f"cd {shlex.quote(str(self.workspace))}"], check=False)
         result = subprocess.run(
             ["bash", "-lc", command],
             cwd=self.workspace,
@@ -34,6 +32,6 @@ class ShellTool:
             timeout=self.timeout,
             check=False,
         )
-        stdout = result.stdout[-12000:]
-        stderr = result.stderr[-12000:]
-        return f"exit_code={result.returncode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+        stdout = result.stdout[-12000:].strip()
+        stderr = result.stderr[-12000:].strip()
+        return f"exit_code={result.returncode}\nSTDOUT:\n{stdout}\n\nSTDERR:\n{stderr}"

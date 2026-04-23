@@ -39,32 +39,32 @@ Still missing for a solid v1:
 ## Phase 1 — harden the current loop
 
 ### 1. Provider-specific adapter split
-- [ ] split `OpenAICompatibleProvider` behavior into capability-aware paths
-- [ ] add explicit provider config for:
-  - [ ] LM Studio
-  - [ ] Ollama
-  - [ ] OpenAI cloud
-- [ ] define capability flags such as:
-  - [ ] supports_native_tools
-  - [ ] supports_json_schema
-  - [ ] supports_beta_parse
-  - [ ] supports_streaming
-- [ ] handle provider-specific message/response quirks cleanly
-- [ ] add tests for each provider mode using fake clients
+- [x] split `OpenAICompatibleProvider` behavior into capability-aware paths
+- [x] add explicit provider config for:
+  - [x] LM Studio
+  - [x] Ollama
+  - [x] OpenAI cloud
+- [x] define capability flags such as:
+  - [x] supports_native_tools
+  - [x] supports_json_schema
+  - [x] supports_beta_parse
+  - [x] supports_streaming
+- [x] handle provider-specific message/response quirks cleanly
+- [x] add tests for each provider mode using fake clients
 
 ### 2. Action generation robustness
-- [ ] support malformed tool arguments more defensively
-- [ ] validate tool name against allowed tools before execution
-- [ ] add repair pass for invalid decisions
-- [ ] improve fallback prompting for weaker local models
-- [ ] log which provider fallback path was used during each decision
+- [x] support malformed tool arguments more defensively
+- [x] validate tool name against allowed tools before execution
+- [x] add repair pass for invalid decisions
+- [x] improve fallback prompting for weaker local models
+- [x] log which provider fallback path was used during each decision
 
 ### 3. Better executor safety
-- [ ] reject unknown tool names before dispatch
-- [ ] validate required tool arguments before execution
-- [ ] limit file size for read/write operations
-- [ ] limit search result count and payload size
-- [ ] normalize command output for easier review by the model
+- [x] reject unknown tool names before dispatch
+- [x] validate required tool arguments before execution
+- [x] limit file size for read/write operations
+- [x] limit search result count and payload size
+- [x] normalize command output for easier review by the model
 
 ---
 
@@ -216,6 +216,6 @@ Still missing for a solid v1:
 
 The best next implementation task is:
 
-**split provider behavior into capability-aware adapters and add explicit provider config for LM Studio, Ollama, and OpenAI cloud.**
+**add patch-first editing with unified diff application and rollback-friendly file tracking.**
 
-That will make the loop more predictable and reduce provider-specific hacks in one shared class.
+That will make code edits safer and move the agent closer to a practical v1 for real repositories.

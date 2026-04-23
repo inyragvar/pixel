@@ -31,7 +31,11 @@ def run(
     settings = Settings(provider=provider, model=model, workspace=workspace.resolve())
     provider_client = build_provider(settings)
 
-    filesystem = FileSystemTool(settings.workspace)
+    filesystem = FileSystemTool(
+        settings.workspace,
+        allowlist_patterns=settings.edit_allowlist or None,
+        denylist_patterns=settings.edit_denylist or None,
+    )
     search = SearchTool(settings.workspace)
     shell = ShellTool(settings.workspace, timeout=settings.command_timeout)
     git = GitTool(settings.workspace)

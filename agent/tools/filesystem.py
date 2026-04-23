@@ -1,8 +1,44 @@
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
+
+
+DEFAULT_DENYLIST_PATTERNS = [
+    ".git/**",
+    ".venv/**",
+    "venv/**",
+    "env/**",
+    "node_modules/**",
+    "__pycache__/**",
+    "build/**",
+    "dist/**",
+    "*.pyc",
+    "*.pyo",
+    "*.so",
+    "*.dll",
+    "*.dylib",
+    "*.exe",
+    "*.bin",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.webp",
+    "*.pdf",
+    "*.zip",
+    "*.tar",
+    "*.gz",
+    "*.mp3",
+    "*.mp4",
+    "*.mov",
+    "*.avi",
+    "*.sqlite",
+    "*.sqlite3",
+    "*.db",
+]
 
 
 class FileSystemTool:
@@ -12,10 +48,15 @@ class FileSystemTool:
         *,
         max_read_bytes: int = 200_000,
         max_write_bytes: int = 500_000,
+        allowlist_patterns: Optional[List[str]] = None,
+        denylist_patterns: Optional[List[str]] = None,
     ) -> None:
         self.workspace = workspace.resolve()
         self.max_read_bytes = max_read_bytes
         self.max_write_bytes = max_write_bytes
+        self.allowlist_patterns = [item.strip() for item in (allowlist_patterns or []) if item.strip()]
+        deny_source = denylist_patterns if denylist_patterns is not None else DEFAULT_DENYLIST_PATTERNS
+        self.denylist_patterns = [item.strip() for item in deny_source if item.strip()]
         self._original_contents: Dict[str, Optional[str]] = {}
 
     def _resolve(self, path: str) -> Path:
@@ -27,11 +68,45 @@ class FileSystemTool:
     def _rel(self, target: Path) -> str:
         return str(target.relative_to(self.workspace))
 
+    def _matches_patterns(self, rel: str, patterns: List[str]) -> bool:
+        rel_posix = Path(rel).as_posix()
+        basename = Path(rel_posix).name
+        for pattern in patterns:
+            pattern = pattern.strip()
+            if not pattern:
+                continue
+            if fnmatch.fnmatch(rel_posix, pattern) or fnmatch.fnmatch(basename, pattern):
+                return True
+        return False
+
+    def _assert_path_allowed(self, target: Path) -> None:
+        rel = self._rel(target)
+        if self._matches_patterns(rel, self.denylist_patterns):
+            raise ValueError(f"Path is blocked by denylist: {rel}")
+        if self.allowlist_patterns and not self._matches_patterns(rel, self.allowlist_patterns):
+            raise ValueError(f"Path is not permitted by allowlist: {rel}")
+
+    def _is_binary_file(self, target: Path) -> bool:
+        if not target.exists() or not target.is_file():
+            return False
+        with target.open("rb") as fh:
+            chunk = fh.read(8192)
+        if b"\x00" in chunk:
+            return True
+        try:
+            chunk.decode("utf-8")
+        except UnicodeDecodeError:
+            return True
+        return False
+
     def _ensure_text_file(self, target: Path) -> None:
+        self._assert_path_allowed(target)
         if target.exists() and not target.is_file():
             raise ValueError("Path is not a regular file")
         if target.exists() and target.stat().st_size > self.max_read_bytes:
             raise ValueError(f"File too large to operate on safely: {target}")
+        if self._is_binary_file(target):
+            raise ValueError(f"Binary file operations are blocked: {self._rel(target)}")
 
     def _check_write_size(self, content: str) -> None:
         if len(content.encode("utf-8")) > self.max_write_bytes:
@@ -45,17 +120,26 @@ class FileSystemTool:
             self._ensure_text_file(target)
             self._original_contents[rel] = target.read_text(encoding="utf-8")
         else:
+            self._assert_path_allowed(target)
             self._original_contents[rel] = None
 
     def list_files(self, path: str = ".") -> List[str]:
         root = self._resolve(path)
         if not root.exists():
             return []
-        return sorted(
-            str(p.relative_to(self.workspace))
-            for p in root.rglob("*")
-            if p.is_file() and ".git" not in p.parts
-        )[:1000]
+        files: List[str] = []
+        for candidate in root.rglob("*"):
+            if not candidate.is_file() or ".git" in candidate.parts:
+                continue
+            rel = str(candidate.relative_to(self.workspace))
+            try:
+                self._assert_path_allowed(candidate)
+            except ValueError:
+                continue
+            if self._is_binary_file(candidate):
+                continue
+            files.append(rel)
+        return sorted(files)[:1000]
 
     def read_file(self, path: str) -> str:
         target = self._resolve(path)
@@ -65,6 +149,7 @@ class FileSystemTool:
     def write_file(self, path: str, content: str) -> str:
         self._check_write_size(content)
         target = self._resolve(path)
+        self._assert_path_allowed(target)
         self._record_original(target)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
@@ -73,8 +158,10 @@ class FileSystemTool:
     def append_file(self, path: str, content: str) -> str:
         self._check_write_size(content)
         target = self._resolve(path)
+        self._assert_path_allowed(target)
         self._record_original(target)
-        self._ensure_text_file(target) if target.exists() else None
+        if target.exists():
+            self._ensure_text_file(target)
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("a", encoding="utf-8") as fh:
             fh.write(content)
@@ -181,13 +268,14 @@ class FileSystemTool:
             if target_path is None:
                 raise ValueError("Patch file section has no target path")
             target = self._resolve(str(target_path))
+            self._assert_path_allowed(target)
             existing_content: Optional[str]
             if old_path is None:
                 existing_content = None
             else:
                 existing_target = self._resolve(str(old_path))
+                self._ensure_text_file(existing_target)
                 if existing_target.exists():
-                    self._ensure_text_file(existing_target)
                     existing_content = existing_target.read_text(encoding="utf-8")
                 else:
                     raise ValueError(f"Patch references missing file: {old_path}")

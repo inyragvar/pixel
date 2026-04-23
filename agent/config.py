@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import List
 
 from pydantic import BaseModel, Field
+
+
+def _parse_csv_env(value: str | None) -> List[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 class Settings(BaseModel):
@@ -20,3 +27,5 @@ class Settings(BaseModel):
             or "http://127.0.0.1:1234/v1"
         )
     )
+    edit_allowlist: List[str] = Field(default_factory=lambda: _parse_csv_env(os.getenv("DEV_AGENT_EDIT_ALLOWLIST")))
+    edit_denylist: List[str] = Field(default_factory=lambda: _parse_csv_env(os.getenv("DEV_AGENT_EDIT_DENYLIST")))

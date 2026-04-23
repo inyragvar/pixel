@@ -286,3 +286,20 @@ Current tests cover:
 7. add GitHub / PR integrations
 
 More detailed execution tracking lives in `TODO.md`.
+
+
+## Edit safety
+
+The agent now blocks unsafe edit targets by default:
+- common artifact/build/cache paths are denylisted
+- binary files are blocked from read/edit operations
+- optional custom allowlist/denylist can be set with environment variables
+
+Environment variables:
+
+```env
+DEV_AGENT_EDIT_ALLOWLIST=agent/**/*.py,tests/**/*.py,README.md
+DEV_AGENT_EDIT_DENYLIST=.git/**,.venv/**,node_modules/**,dist/**,build/**
+```
+
+If `DEV_AGENT_EDIT_ALLOWLIST` is empty, the agent allows text files outside the denylist.

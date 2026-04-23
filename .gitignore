@@ -85,6 +85,3 @@ node_modules/
 coverage/
 .next/
 dist-frontend/
-
-# Custom
-dev-agent.zip

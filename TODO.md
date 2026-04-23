@@ -78,8 +78,8 @@ Still missing for a solid v1:
 - [x] add tests for patch application and rollback flow
 
 ### 5. Safer file operations
-- [ ] add allowlist / denylist for editable paths
-- [ ] block binary file writes by default
+- [x] add allowlist / denylist for editable paths
+- [x] block binary file writes by default
 - [x] add backup/rollback for file edits during one run
 - [ ] track before/after file hashes
 

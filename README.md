@@ -17,7 +17,6 @@ This project is an early **v1 scaffold**.
 
 Implemented now:
 - provider abstraction for LM Studio / Ollama / OpenAI-compatible APIs
-- capability-aware provider config with explicit provider presets
 - bounded agent loop with action/observation history
 - planner + reviewer scaffolding
 - provider-level action generation with fallbacks:
@@ -28,17 +27,22 @@ Implemented now:
   - file listing and file reading
   - file writing and appending
   - targeted in-file replacement
-  - unified-diff patch application
-  - rollback of tracked file edits
   - code search via `rg`
   - safe shell command execution
   - git status and diff
 - CLI entrypoint
-- test coverage for loop flow, filesystem, repo map, and provider parsing
+- per-run artifact storage under `.dev-agent/runs/<run-id>/`
+- persisted run registry in both JSONL and SQLite
+- replay/list support for past runs
+- project detection + validation profiles for Python / Node / Go / Rust
+- `run_validation` tool for automatic sensible validation commands
+- test coverage for loop flow, filesystem, repo map, provider parsing, run registry, and project detection
 
 Not implemented yet:
+- unified-diff patch application
 - Docker sandbox / isolated task workspace
 - approval gates for dangerous actions
+- provider-specific capability flags
 - streaming / resumable runs
 - semantic code index / embeddings
 - GitHub / PR / issue tracker integrations
@@ -66,11 +70,9 @@ CLI
 The provider layer hides differences between backends.
 
 Current behavior:
-1. use provider-specific capability flags
-2. try native tool calling if supported by the backend/model
-3. fall back to JSON schema response formatting if available
-4. fall back again to plain JSON text parsing
-5. repair malformed tool args when possible
+1. try native tool calling if supported by the backend/model
+2. fall back to JSON schema response formatting if available
+3. fall back again to plain JSON text parsing
 
 This makes the scaffold much more tolerant of local models that are inconsistent about strict schema following.
 
@@ -89,7 +91,7 @@ The executor exposes:
 - available tool names
 - JSON tool schemas
 - tool dispatch
-- tracking of changed files, tracked originals, and commands run
+- tracking of changed files and commands run
 
 ---
 
@@ -200,9 +202,28 @@ The current CLI flow returns:
 - changed files
 - commands run
 - recent agent history
-- provider decision mode per step
+- run ID
+- artifact directory
 
 This is enough to support early debugging and iteration on the agent loop.
+
+### Run history commands
+
+List past runs:
+
+```bash
+dev-agent --list-runs --workspace .
+```
+
+Replay a stored run:
+
+```bash
+dev-agent --replay-run <run-id> --workspace .
+```
+
+Stored metadata lives in:
+- JSONL: `.dev-agent/runs/registry.jsonl`
+- SQLite: `.dev-agent/runs/registry.sqlite3`
 
 ---
 
@@ -214,14 +235,21 @@ This is enough to support early debugging and iteration on the agent loop.
 - `write_file(path, content)`
 - `append_file(path, content)`
 - `replace_in_file(path, old, new, count=1)`
-- `apply_patch(patch)`
-- `rollback_file(path)`
-- `rollback_all()`
 
 ### SearchTool
 - `search_code(query)`
 
 Requires `rg`.
+
+### ValidationTool
+- `detect_project()`
+- `run_validation(mode="all")`
+
+Supported profiles:
+- Python: pytest / ruff / mypy / compileall when applicable
+- Node: package.json scripts via npm / pnpm / yarn
+- Go: `go test ./...`, `go vet ./...`, `go build ./...`
+- Rust: `cargo test`, `cargo check`, `cargo build`, `cargo clippy ...`
 
 ### ShellTool
 - `run_command(command)`
@@ -231,7 +259,6 @@ Current safeguards:
 - timeout
 - output truncation
 - small denylist for obviously dangerous commands
-- tool arg validation before dispatch
 
 ### GitTool
 - `status()`
@@ -263,8 +290,8 @@ Run:
 
 ```bash
 python -m pytest -v
-python -m pytest tests/test_agent_loop.py -v
-python -m pytest -k provider
+python -m pytest tests/test_loop.py -v
+python -m pytest -k action
 ```
 
 Current tests cover:
@@ -288,37 +315,19 @@ Current tests cover:
 More detailed execution tracking lives in `TODO.md`.
 
 
-## Edit safety
+## Run artifacts
 
-The agent now blocks unsafe edit targets by default:
-- common artifact/build/cache paths are denylisted
-- binary files are blocked from read/edit operations
-- optional custom allowlist/denylist can be set with environment variables
+Each run now writes structured artifacts under `.dev-agent/runs/<run-id>/` inside the workspace.
 
-Environment variables:
+Artifacts include:
+- `task.txt`
+- `events.jsonl`
+- `prompts/plan_prompt.json`
+- `prompts/step_XX_decision_prompt.json`
+- `outputs/plan.json`
+- `outputs/step_XX_tool.json`
+- `outputs/step_XX_result.txt`
+- `outputs/final_summary.json`
+- `outputs/run_state.json`
 
-```env
-DEV_AGENT_EDIT_ALLOWLIST=agent/**/*.py,tests/**/*.py,README.md
-DEV_AGENT_EDIT_DENYLIST=.git/**,.venv/**,node_modules/**,dist/**,build/**
-```
-
-If `DEV_AGENT_EDIT_ALLOWLIST` is empty, the agent allows text files outside the denylist.
-
-
-## Workspace isolation
-
-By default, the agent runs inside an isolated temporary copy of the target workspace instead of editing your live repo directly.
-
-CLI options:
-- `--isolate / --no-isolate` — enable or disable isolation
-- `--keep-workspace` — keep the isolated workspace after the run for inspection
-
-Environment variables:
-- `DEV_AGENT_ISOLATE_WORKSPACE=true|false`
-- `DEV_AGENT_KEEP_ISOLATED_WORKSPACE=true|false`
-
-Typical usage:
-
-```bash
-dev-agent --task "Inspect this repo and propose the best next change" --workspace . --keep-workspace
-```
+Set `DEV_AGENT_ARTIFACTS_DIR` to change the artifact root relative to the workspace.

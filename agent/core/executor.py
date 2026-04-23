@@ -6,35 +6,23 @@ from agent.tools.filesystem import FileSystemTool
 from agent.tools.git_tools import GitTool
 from agent.tools.search import SearchTool
 from agent.tools.shell import ShellTool
+from agent.tools.validation import ValidationTool
 
 
 class Executor:
-    TOOL_ARG_RULES: Dict[str, Dict[str, Any]] = {
-        "list_files": {"required": [], "allowed": {"path"}},
-        "read_file": {"required": ["path"], "allowed": {"path"}},
-        "search_code": {"required": ["query"], "allowed": {"query"}},
-        "write_file": {"required": ["path", "content"], "allowed": {"path", "content"}},
-        "replace_in_file": {"required": ["path", "old", "new"], "allowed": {"path", "old", "new", "count"}},
-        "append_file": {"required": ["path", "content"], "allowed": {"path", "content"}},
-        "apply_patch": {"required": ["patch"], "allowed": {"patch"}},
-        "rollback_file": {"required": ["path"], "allowed": {"path"}},
-        "rollback_all": {"required": [], "allowed": set()},
-        "run_command": {"required": ["command"], "allowed": {"command"}},
-        "git_status": {"required": [], "allowed": set()},
-        "git_diff": {"required": [], "allowed": set()},
-    }
-
     def __init__(
         self,
         filesystem: FileSystemTool,
         search: SearchTool,
         shell: ShellTool,
         git: GitTool,
+        validation: ValidationTool,
     ) -> None:
         self.filesystem = filesystem
         self.search = search
         self.shell = shell
         self.git = git
+        self.validation = validation
 
     def available_tools(self) -> List[str]:
         return [tool["function"]["name"] for tool in self.tool_schemas()]
@@ -49,7 +37,7 @@ class Executor:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {"type": "string", "description": "Relative path, default '.'"},
+                            "path": {"type": "string", "description": "Relative path, default '.'"}
                         },
                     },
                 },
@@ -62,7 +50,7 @@ class Executor:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {"type": "string", "description": "Relative file path to read"},
+                            "path": {"type": "string", "description": "Relative file path to read"}
                         },
                         "required": ["path"],
                     },
@@ -76,7 +64,7 @@ class Executor:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "query": {"type": "string", "description": "Text or regex-like query"},
+                            "query": {"type": "string", "description": "Text or regex-like query"}
                         },
                         "required": ["query"],
                     },
@@ -132,50 +120,35 @@ class Executor:
             {
                 "type": "function",
                 "function": {
-                    "name": "apply_patch",
-                    "description": "Apply a unified diff patch to one or more text files. Prefer this for multi-line edits.",
+                    "name": "run_command",
+                    "description": "Run a safe workspace-local shell command for validation or inspection.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "patch": {"type": "string", "description": "Unified diff patch text"},
+                            "command": {"type": "string", "description": "Single shell command to run"}
                         },
-                        "required": ["patch"],
+                        "required": ["command"],
                     },
                 },
             },
             {
                 "type": "function",
                 "function": {
-                    "name": "rollback_file",
-                    "description": "Restore one tracked file to its original content from the start of this run.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "path": {"type": "string"},
-                        },
-                        "required": ["path"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "rollback_all",
-                    "description": "Restore all tracked file changes made during this run.",
+                    "name": "detect_project",
+                    "description": "Detect the project type and available validation commands for the current workspace.",
                     "parameters": {"type": "object", "properties": {}},
                 },
             },
             {
                 "type": "function",
                 "function": {
-                    "name": "run_command",
-                    "description": "Run a safe workspace-local shell command for validation or inspection.",
+                    "name": "run_validation",
+                    "description": "Run sensible validation commands automatically for the detected project. Modes: all, test, lint, typecheck, build.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "command": {"type": "string", "description": "Single shell command to run"},
+                            "mode": {"type": "string", "enum": ["all", "test", "lint", "typecheck", "build"]}
                         },
-                        "required": ["command"],
                     },
                 },
             },
@@ -197,63 +170,45 @@ class Executor:
             },
         ]
 
-    def _validate_tool_call(self, tool_name: str, args: Dict[str, Any]) -> None:
-        if tool_name not in self.TOOL_ARG_RULES:
-            raise ValueError(f"Unknown tool: {tool_name}")
-        if not isinstance(args, dict):
-            raise ValueError(f"Tool args for {tool_name} must be a JSON object")
-        rules = self.TOOL_ARG_RULES[tool_name]
-        missing = [key for key in rules["required"] if key not in args]
-        if missing:
-            raise ValueError(f"Missing required args for {tool_name}: {', '.join(missing)}")
-        unknown = sorted(set(args) - set(rules["allowed"]))
-        if unknown:
-            raise ValueError(f"Unknown args for {tool_name}: {', '.join(unknown)}")
-
-    def run_tool(self, tool_name: str, args: Dict[str, Any]) -> Tuple[str, List[str], List[str]]:
-        self._validate_tool_call(tool_name, args)
+    def run_tool(self, tool: str, args: Dict[str, Any]) -> Tuple[str, List[str], List[str]]:
         changed_files: List[str] = []
         commands_run: List[str] = []
 
-        if tool_name == "list_files":
+        if tool == "list_files":
             return "\n".join(self.filesystem.list_files(args.get("path", "."))), changed_files, commands_run
-        if tool_name == "read_file":
+        if tool == "read_file":
             return self.filesystem.read_file(args["path"]), changed_files, commands_run
-        if tool_name == "search_code":
+        if tool == "search_code":
             return "\n".join(self.search.search_code(args["query"])), changed_files, commands_run
-        if tool_name == "write_file":
-            changed_path = self.filesystem.write_file(args["path"], args["content"])
-            changed_files = [changed_path]
-            return f"Wrote file: {changed_path}", changed_files, commands_run
-        if tool_name == "replace_in_file":
-            changed_path = self.filesystem.replace_in_file(
-                args["path"],
-                args["old"],
-                args["new"],
-                count=int(args.get("count", 1)),
-            )
-            changed_files = [changed_path]
-            return f"Updated file: {changed_path}", changed_files, commands_run
-        if tool_name == "append_file":
-            changed_path = self.filesystem.append_file(args["path"], args["content"])
-            changed_files = [changed_path]
-            return f"Appended file: {changed_path}", changed_files, commands_run
-        if tool_name == "apply_patch":
-            changed_files = self.filesystem.apply_patch(args["patch"])
-            return "Applied patch to: " + ", ".join(changed_files), changed_files, commands_run
-        if tool_name == "rollback_file":
-            changed_path = self.filesystem.rollback_file(args["path"])
-            changed_files = [changed_path]
-            return f"Rolled back file: {changed_path}", changed_files, commands_run
-        if tool_name == "rollback_all":
-            changed_files = self.filesystem.rollback_all()
-            return "Rolled back tracked files: " + ", ".join(changed_files), changed_files, commands_run
-        if tool_name == "run_command":
+        if tool == "write_file":
+            changed_files = [self.filesystem.write_file(args["path"], args["content"])]
+            return f"Wrote file: {changed_files[0]}", changed_files, commands_run
+        if tool == "replace_in_file":
+            changed_files = [
+                self.filesystem.replace_in_file(
+                    args["path"],
+                    args["old"],
+                    args["new"],
+                    count=int(args.get("count", 1)),
+                )
+            ]
+            return f"Updated file: {changed_files[0]}", changed_files, commands_run
+        if tool == "append_file":
+            changed_files = [self.filesystem.append_file(args["path"], args["content"])]
+            return f"Appended file: {changed_files[0]}", changed_files, commands_run
+        if tool == "run_command":
             command = args["command"]
             commands_run = [command]
             return self.shell.run_command(command), changed_files, commands_run
-        if tool_name == "git_status":
+        if tool == "detect_project":
+            return self.validation.detect_project(), changed_files, commands_run
+        if tool == "run_validation":
+            mode = str(args.get("mode", "all"))
+            result = self.validation.run_validation(mode)
+            commands_run = [line[2:] for line in result.splitlines() if line.startswith("$ ")]
+            return result, changed_files, commands_run
+        if tool == "git_status":
             return self.git.status(), changed_files, commands_run
-        if tool_name == "git_diff":
+        if tool == "git_diff":
             return self.git.diff(), changed_files, commands_run
-        raise ValueError(f"Unknown tool: {tool_name}")
+        raise ValueError(f"Unknown tool: {tool}")

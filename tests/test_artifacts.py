@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from agent.artifacts import ArtifactStore
 from agent.core.executor import Executor
 from agent.core.loop import AgentLoop
 from agent.core.planner import Planner
@@ -24,27 +26,20 @@ class FakeProvider:
         self.calls += 1
         if response_schema is Plan:
             return Plan(
-                summary="Inspect, modify, validate.",
-                steps=[PlanStep(id="1", title="Inspect", description="Read the file")],
+                summary="Inspect and validate.",
+                steps=[PlanStep(id="1", title="Inspect", description="Read files")],
             )
         if response_schema is AgentDecision:
             if self.calls == 2:
                 return AgentDecision(
                     decision="tool",
-                    tool=ToolAction(tool="read_file", args={"path": "main.py"}),
-                )
-            if self.calls == 3:
-                return AgentDecision(
-                    decision="tool",
-                    tool=ToolAction(
-                        tool="replace_in_file",
-                        args={"path": "main.py", "old": "hello", "new": "hello world"},
-                    ),
+                    tool=ToolAction(tool="run_command", args={"command": "pwd"}),
                 )
             return AgentDecision(
                 decision="final",
-                summary="Implemented the requested change.",
-                changed_files=["main.py"],
+                summary="Done.",
+                changed_files=[],
+                next_steps=["Review artifacts"],
             )
         if response_schema is FinalAnswer:
             return FinalAnswer(summary="Fallback summary")
@@ -59,9 +54,8 @@ class FakeProvider:
         )
 
 
-def test_agent_loop_executes_tool_steps(tmp_path: Path) -> None:
+def test_artifacts_are_written(tmp_path: Path) -> None:
     workspace = tmp_path
-    (workspace / "main.py").write_text("print('hello')\n", encoding="utf-8")
     (workspace / ".git").mkdir()
 
     provider = FakeProvider()
@@ -72,20 +66,28 @@ def test_agent_loop_executes_tool_steps(tmp_path: Path) -> None:
         git=GitTool(workspace),
         validation=ValidationTool(workspace, ShellTool(workspace)),
     )
+    artifact_store = ArtifactStore.create(workspace / ".dev-agent" / "runs")
     loop = AgentLoop(
         planner=Planner(provider, "fake-model"),
         executor=executor,
         reviewer=Reviewer(provider, "fake-model"),
         provider=provider,
         model="fake-model",
-        max_steps=5,
+        max_steps=4,
+        artifact_store=artifact_store,
     )
 
-    plan, state, summary = loop.run("Update greeting")
+    _, state, summary = loop.run("Inspect repo")
 
-    assert plan.summary == "Inspect, modify, validate."
-    assert state.finished is True
-    assert "read_file" in state.actions_taken
-    assert "replace_in_file" in state.actions_taken
-    assert summary.changed_files == ["main.py"]
-    assert "hello world" in (workspace / "main.py").read_text(encoding="utf-8")
+    assert state.artifact_dir == str(artifact_store.root)
+    assert summary.summary == "Done."
+    assert (artifact_store.root / "task.txt").exists()
+    assert (artifact_store.root / "prompts" / "plan_prompt.json").exists()
+    assert (artifact_store.root / "prompts" / "step_01_decision_prompt.json").exists()
+    assert (artifact_store.root / "outputs" / "plan.json").exists()
+    assert (artifact_store.root / "outputs" / "step_01_tool.json").exists()
+    assert (artifact_store.root / "outputs" / "step_01_result.txt").exists()
+    assert (artifact_store.root / "outputs" / "final_summary.json").exists()
+    events = (artifact_store.root / "events.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert any(json.loads(line)["type"] == "run_started" for line in events)
+    assert any(json.loads(line)["type"] == "tool_result" for line in events)

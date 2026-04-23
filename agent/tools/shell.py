@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -19,19 +21,27 @@ class ShellTool:
         self.timeout = timeout
 
     def run_command(self, command: str) -> str:
-        normalized = " ".join(command.strip().split())
+        normalized = command.strip()
         for denied in self.DENYLIST:
             if denied in normalized:
                 raise ValueError(f"Blocked dangerous command pattern: {denied}")
 
+        bootstrap = (
+            "if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then "
+            "alias python=python3; "
+            "fi; "
+        )
+        shell_command = bootstrap + command
+        env = os.environ.copy()
         result = subprocess.run(
-            ["bash", "-lc", command],
+            ["bash", "-lc", shell_command],
             cwd=self.workspace,
             text=True,
             capture_output=True,
             timeout=self.timeout,
             check=False,
+            env=env,
         )
-        stdout = result.stdout[-12000:].strip()
-        stderr = result.stderr[-12000:].strip()
-        return f"exit_code={result.returncode}\nSTDOUT:\n{stdout}\n\nSTDERR:\n{stderr}"
+        stdout = result.stdout[-12000:]
+        stderr = result.stderr[-12000:]
+        return f"exit_code={result.returncode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"

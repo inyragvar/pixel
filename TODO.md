@@ -32,55 +32,55 @@ Still missing for a solid v1:
 - [ ] safer execution strategy
 - [ ] provider-specific behavior tuning
 - [ ] better codebase retrieval
-- [ ] persisted runs and replay/debugging
+- [x] persisted runs and replay/debugging
 
 ---
 
 ## Phase 1 — harden the current loop
 
 ### 1. Provider-specific adapter split
-- [x] split `OpenAICompatibleProvider` behavior into capability-aware paths
-- [x] add explicit provider config for:
-  - [x] LM Studio
-  - [x] Ollama
-  - [x] OpenAI cloud
-- [x] define capability flags such as:
-  - [x] supports_native_tools
-  - [x] supports_json_schema
-  - [x] supports_beta_parse
-  - [x] supports_streaming
-- [x] handle provider-specific message/response quirks cleanly
-- [x] add tests for each provider mode using fake clients
+- [ ] split `OpenAICompatibleProvider` behavior into capability-aware paths
+- [ ] add explicit provider config for:
+  - [ ] LM Studio
+  - [ ] Ollama
+  - [ ] OpenAI cloud
+- [ ] define capability flags such as:
+  - [ ] supports_native_tools
+  - [ ] supports_json_schema
+  - [ ] supports_beta_parse
+  - [ ] supports_streaming
+- [ ] handle provider-specific message/response quirks cleanly
+- [ ] add tests for each provider mode using fake clients
 
 ### 2. Action generation robustness
-- [x] support malformed tool arguments more defensively
-- [x] validate tool name against allowed tools before execution
-- [x] add repair pass for invalid decisions
-- [x] improve fallback prompting for weaker local models
-- [x] log which provider fallback path was used during each decision
+- [ ] support malformed tool arguments more defensively
+- [ ] validate tool name against allowed tools before execution
+- [ ] add repair pass for invalid decisions
+- [ ] improve fallback prompting for weaker local models
+- [ ] log which provider fallback path was used during each decision
 
 ### 3. Better executor safety
-- [x] reject unknown tool names before dispatch
-- [x] validate required tool arguments before execution
-- [x] limit file size for read/write operations
-- [x] limit search result count and payload size
-- [x] normalize command output for easier review by the model
+- [ ] reject unknown tool names before dispatch
+- [ ] validate required tool arguments before execution
+- [ ] limit file size for read/write operations
+- [ ] limit search result count and payload size
+- [ ] normalize command output for easier review by the model
 
 ---
 
 ## Phase 2 — improve editing
 
 ### 4. Patch-first editing
-- [x] add unified diff patch application tool
-- [x] prefer patch application over full-file rewrite
-- [x] keep `write_file` for new files or explicit full rewrites only
-- [x] capture patch failures with precise error output
-- [x] add tests for patch application and rollback flow
+- [ ] add unified diff patch application tool
+- [ ] prefer patch application over full-file rewrite
+- [ ] keep `write_file` for new files or explicit full rewrites only
+- [ ] capture patch failures with precise error output
+- [ ] add tests for patch application edge cases
 
 ### 5. Safer file operations
-- [x] add allowlist / denylist for editable paths
-- [x] block binary file writes by default
-- [x] add backup/rollback for file edits during one run
+- [ ] add allowlist / denylist for editable paths
+- [ ] block binary file writes by default
+- [ ] add backup/rollback for file edits during one run
 - [ ] track before/after file hashes
 
 ---
@@ -108,9 +108,8 @@ Still missing for a solid v1:
 ## Phase 4 — safer execution environment
 
 ### 9. Workspace isolation
-- [x] create a per-task temp isolated workspace copy
-- [x] support copying the target repo into a run directory
-- [ ] support git worktree isolation for large repos
+- [ ] create a per-task temp workspace or git worktree
+- [ ] support copying or cloning the target repo into a run directory
 - [ ] keep artifacts per run:
   - [ ] logs
   - [ ] prompts
@@ -144,9 +143,9 @@ Still missing for a solid v1:
 - [ ] show step budget and token/debug stats
 
 ### 13. Logging and persistence
-- [ ] persist runs to JSONL or SQLite
-- [ ] store final summaries and outcomes
-- [ ] support replaying a past run for debugging
+- [x] persist runs to JSONL or SQLite
+- [x] store final summaries and outcomes
+- [x] support replaying a past run for debugging
 - [ ] redact secrets from stored logs
 
 ### 14. Streaming
@@ -159,13 +158,13 @@ Still missing for a solid v1:
 ## Phase 6 — validation and quality
 
 ### 15. Validation pipeline
-- [ ] detect project type and choose default validation commands
-- [ ] add configurable validation profiles:
-  - [ ] Python
-  - [ ] Node
-  - [ ] Go
-  - [ ] Rust
-- [ ] support lint + tests + typecheck as separate steps
+- [x] detect project type and choose default validation commands
+- [x] add configurable validation profiles:
+  - [x] Python
+  - [x] Node
+  - [x] Go
+  - [x] Rust
+- [x] support lint + tests + typecheck as separate steps
 
 ### 16. Reviewer improvements
 - [ ] add explicit fix-verification step before finalize
@@ -217,6 +216,18 @@ Still missing for a solid v1:
 
 The best next implementation task is:
 
-**add patch-first editing with unified diff application and rollback-friendly file tracking.**
+**add project detection plus validation profiles (Python, Node, Go, Rust), so the agent can choose sensible default test/lint/typecheck commands instead of relying on task wording.**
 
-That will make code edits safer and move the agent closer to a practical v1 for real repositories.
+That will make the agent more useful outside Python-first repos and improve multi-language reliability.
+
+
+## Newly completed
+
+- [x] per-run artifact storage
+- [x] structured event log (`events.jsonl`)
+- [x] prompt capture for planning and decisions
+- [x] per-step tool output capture
+- [x] final summary and run state export
+- [x] persisted run registry in JSONL and SQLite
+- [x] run listing via CLI
+- [x] replay run inspection via CLI

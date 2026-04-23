@@ -13,10 +13,9 @@ class ToolAction(BaseModel):
         "write_file",
         "replace_in_file",
         "append_file",
-        "apply_patch",
-        "rollback_file",
-        "rollback_all",
         "run_command",
+        "detect_project",
+        "run_validation",
         "git_status",
         "git_diff",
     ]

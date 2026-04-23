@@ -303,3 +303,22 @@ DEV_AGENT_EDIT_DENYLIST=.git/**,.venv/**,node_modules/**,dist/**,build/**
 ```
 
 If `DEV_AGENT_EDIT_ALLOWLIST` is empty, the agent allows text files outside the denylist.
+
+
+## Workspace isolation
+
+By default, the agent runs inside an isolated temporary copy of the target workspace instead of editing your live repo directly.
+
+CLI options:
+- `--isolate / --no-isolate` — enable or disable isolation
+- `--keep-workspace` — keep the isolated workspace after the run for inspection
+
+Environment variables:
+- `DEV_AGENT_ISOLATE_WORKSPACE=true|false`
+- `DEV_AGENT_KEEP_ISOLATED_WORKSPACE=true|false`
+
+Typical usage:
+
+```bash
+dev-agent --task "Inspect this repo and propose the best next change" --workspace . --keep-workspace
+```

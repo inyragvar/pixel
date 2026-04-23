@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import List
 
+
 from pydantic import BaseModel, Field
 
 
@@ -11,6 +12,12 @@ def _parse_csv_env(value: str | None) -> List[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _parse_bool_env(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class Settings(BaseModel):
@@ -29,3 +36,6 @@ class Settings(BaseModel):
     )
     edit_allowlist: List[str] = Field(default_factory=lambda: _parse_csv_env(os.getenv("DEV_AGENT_EDIT_ALLOWLIST")))
     edit_denylist: List[str] = Field(default_factory=lambda: _parse_csv_env(os.getenv("DEV_AGENT_EDIT_DENYLIST")))
+
+    isolate_workspace: bool = Field(default=_parse_bool_env(os.getenv("DEV_AGENT_ISOLATE_WORKSPACE"), True))
+    keep_isolated_workspace: bool = Field(default=_parse_bool_env(os.getenv("DEV_AGENT_KEEP_ISOLATED_WORKSPACE"), False))

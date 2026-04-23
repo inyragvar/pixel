@@ -16,6 +16,7 @@ from agent.tools.filesystem import FileSystemTool
 from agent.tools.git_tools import GitTool
 from agent.tools.search import SearchTool
 from agent.tools.shell import ShellTool
+from agent.workspace import WorkspaceManager
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -27,18 +28,33 @@ def run(
     provider: str = typer.Option("lmstudio", help="Provider name"),
     model: str = typer.Option("qwen/qwen3-coder-30b", help="Model identifier"),
     workspace: Path = typer.Option(Path("."), help="Workspace path"),
+    isolate: bool = typer.Option(True, "--isolate/--no-isolate", help="Run in an isolated workspace copy"),
+    keep_workspace: bool = typer.Option(False, "--keep-workspace", help="Keep the isolated workspace after the run"),
 ) -> None:
-    settings = Settings(provider=provider, model=model, workspace=workspace.resolve())
+    settings = Settings(
+        provider=provider,
+        model=model,
+        workspace=workspace.resolve(),
+        isolate_workspace=isolate,
+        keep_isolated_workspace=keep_workspace,
+    )
     provider_client = build_provider(settings)
 
-    filesystem = FileSystemTool(
+    workspace_manager = WorkspaceManager(
         settings.workspace,
+        enabled=settings.isolate_workspace,
+        keep_isolated=settings.keep_isolated_workspace,
+    )
+    run_workspace = workspace_manager.prepare()
+
+    filesystem = FileSystemTool(
+        run_workspace.root_path,
         allowlist_patterns=settings.edit_allowlist or None,
         denylist_patterns=settings.edit_denylist or None,
     )
-    search = SearchTool(settings.workspace)
-    shell = ShellTool(settings.workspace, timeout=settings.command_timeout)
-    git = GitTool(settings.workspace)
+    search = SearchTool(run_workspace.root_path)
+    shell = ShellTool(run_workspace.root_path, timeout=settings.command_timeout)
+    git = GitTool(run_workspace.root_path)
     executor = Executor(filesystem, search, shell, git)
 
     loop = AgentLoop(
@@ -50,8 +66,15 @@ def run(
         max_steps=settings.max_steps,
     )
 
-    plan, state, summary = loop.run(task)
+    try:
+        plan, state, summary = loop.run(task)
+    finally:
+        if settings.keep_isolated_workspace:
+            console.print(f"Workspace kept at: {run_workspace.root_path}")
+        elif settings.isolate_workspace:
+            console.print(f"Isolated workspace: {run_workspace.root_path}")
 
+    console.print(Panel(f"Mode: {run_workspace.mode}\nSource: {run_workspace.source_path}\nActive: {run_workspace.root_path}", title="Workspace"))
     console.print(Panel(plan.summary, title="Plan Summary"))
     for step in plan.steps:
         console.print(f"- [{step.id}] {step.title}: {step.description}")
@@ -76,6 +99,9 @@ def run(
         console.print("Next steps:")
         for item in summary.next_steps:
             console.print(f"- {item}")
+
+    if settings.isolate_workspace and not settings.keep_isolated_workspace:
+        run_workspace.cleanup()
 
 
 if __name__ == "__main__":

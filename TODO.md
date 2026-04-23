@@ -108,8 +108,9 @@ Still missing for a solid v1:
 ## Phase 4 — safer execution environment
 
 ### 9. Workspace isolation
-- [ ] create a per-task temp workspace or git worktree
-- [ ] support copying or cloning the target repo into a run directory
+- [x] create a per-task temp isolated workspace copy
+- [x] support copying the target repo into a run directory
+- [ ] support git worktree isolation for large repos
 - [ ] keep artifacts per run:
   - [ ] logs
   - [ ] prompts

@@ -13,6 +13,7 @@ class ToolAction(BaseModel):
         "write_file",
         "replace_in_file",
         "append_file",
+        "apply_patch",
         "run_command",
         "detect_project",
         "run_validation",

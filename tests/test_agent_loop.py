@@ -89,3 +89,32 @@ def test_agent_loop_executes_tool_steps(tmp_path: Path) -> None:
     assert "replace_in_file" in state.actions_taken
     assert summary.changed_files == ["main.py"]
     assert "hello world" in (workspace / "main.py").read_text(encoding="utf-8")
+
+
+def test_executor_rejects_missing_required_args(tmp_path: Path) -> None:
+    executor = Executor(
+        filesystem=FileSystemTool(tmp_path),
+        search=SearchTool(tmp_path),
+        shell=ShellTool(tmp_path),
+        git=GitTool(tmp_path),
+        validation=ValidationTool(tmp_path, ShellTool(tmp_path)),
+    )
+
+    try:
+        executor.run_tool("read_file", {})
+    except ValueError as exc:
+        assert "Missing required argument" in str(exc)
+    else:
+        raise AssertionError("Expected missing argument validation to fail")
+
+
+def test_executor_exposes_apply_patch(tmp_path: Path) -> None:
+    executor = Executor(
+        filesystem=FileSystemTool(tmp_path),
+        search=SearchTool(tmp_path),
+        shell=ShellTool(tmp_path),
+        git=GitTool(tmp_path),
+        validation=ValidationTool(tmp_path, ShellTool(tmp_path)),
+    )
+
+    assert "apply_patch" in executor.available_tools()

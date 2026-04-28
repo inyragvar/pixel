@@ -231,3 +231,31 @@ That will make the agent more useful outside Python-first repos and improve mult
 - [x] persisted run registry in JSONL and SQLite
 - [x] run listing via CLI
 - [x] replay run inspection via CLI
+
+## MWP implementation progress — 2026-04-28
+
+Completed in this pass:
+- [x] Added `apply_patch` tool for unified-diff, patch-first editing.
+- [x] Exposed `apply_patch` in executor tool schemas and action schema.
+- [x] Added defensive executor argument validation before dispatch.
+- [x] Added explicit unknown-tool rejection before dispatch.
+- [x] Added text-file safety checks for read/edit operations.
+- [x] Added file read/write/list size limits to reduce accidental huge context/tool payloads.
+- [x] Added binary-file edit protection for filesystem writes/replacements/patches.
+- [x] Added bounded search output and common dependency-directory exclusions.
+- [x] Added tests for patch application and patch context mismatch.
+- [x] Added tests for executor argument validation and `apply_patch` tool exposure.
+
+Notes:
+- `write_file` remains available for new files or explicit full rewrites.
+- `apply_patch` should be preferred by prompts/agent behavior for normal edits.
+- Local pytest execution in this container hangs because the container `python` process does not exit cleanly after site initialization; syntax compilation and direct filesystem patch tests were verified with `python -S`.
+
+Recommended next MWP task:
+- [ ] Integrate `WorkspaceManager` into the CLI runtime so normal agent runs execute inside an isolated copy by default, with an explicit live-workspace mode for direct edits.
+- [x] Wired `WorkspaceManager` into CLI as an opt-in `--isolated-workspace` mode.
+- [x] Added `--keep-isolated` and `--isolated-base-dir` CLI options for isolated run inspection/control.
+- [x] Kept live workspace as the default so MWP runs still apply actual repository edits unless isolation is explicitly requested.
+
+Next isolation improvement:
+- [ ] Add an explicit “copy changes back from isolated workspace” flow, or keep isolated mode as dry-run only.

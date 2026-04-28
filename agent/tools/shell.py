@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -20,18 +22,29 @@ class ShellTool:
         self.workspace = workspace
         self.timeout = timeout
 
+    def _resolve_command(self, command: str) -> str:
+      normalized = command.strip()
+      if not normalized:
+          return normalized
+
+      parts = shlex.split(normalized, posix=True)
+      if not parts:
+          return normalized
+
+      if parts[0] == "python":
+          python_bin = shutil.which("python") or sys.executable or shutil.which("python3") or "python"
+          parts[0] = python_bin
+          return shlex.join(parts)
+
+      return normalized
+
     def run_command(self, command: str) -> str:
         normalized = command.strip()
         for denied in self.DENYLIST:
             if denied in normalized:
                 raise ValueError(f"Blocked dangerous command pattern: {denied}")
 
-        bootstrap = (
-            "if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then "
-            "alias python=python3; "
-            "fi; "
-        )
-        shell_command = bootstrap + command
+        shell_command = self._resolve_command(command)
         env = os.environ.copy()
         result = subprocess.run(
             ["bash", "-lc", shell_command],

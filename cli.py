@@ -23,25 +23,28 @@ from agent.tools.git_tools import GitTool
 from agent.tools.search import SearchTool
 from agent.tools.shell import ShellTool
 from agent.tools.validation import ValidationTool
+from agent.workspace import WorkspaceManager
 
 app = typer.Typer(add_completion=False)
 console = Console()
 
 
-def _build_runtime(settings: Settings):
+def _build_runtime(settings: Settings, *, runtime_workspace: Path | None = None, artifacts_workspace: Path | None = None):
+    tool_workspace = (runtime_workspace or settings.workspace).resolve()
+    artifact_workspace = (artifacts_workspace or settings.workspace).resolve()
     provider_client = build_provider(settings)
     filesystem = FileSystemTool(
-        settings.workspace,
+        tool_workspace,
         allowlist_patterns=[p.strip() for p in settings.edit_allowlist.split(",") if p.strip()],
         denylist_patterns=[p.strip() for p in settings.edit_denylist.split(",") if p.strip()] or (),
     )
-    search = SearchTool(settings.workspace)
-    shell = ShellTool(settings.workspace, timeout=settings.command_timeout)
-    git = GitTool(settings.workspace)
-    validation = ValidationTool(settings.workspace, shell)
+    search = SearchTool(tool_workspace)
+    shell = ShellTool(tool_workspace, timeout=settings.command_timeout)
+    git = GitTool(tool_workspace)
+    validation = ValidationTool(tool_workspace, shell)
     executor = Executor(filesystem, search, shell, git, validation)
-    artifact_store = ArtifactStore.create(settings.workspace / settings.artifacts_dir_name)
-    registry = RunRegistry(settings.workspace / settings.artifacts_dir_name)
+    artifact_store = ArtifactStore.create(artifact_workspace / settings.artifacts_dir_name)
+    registry = RunRegistry(artifact_workspace / settings.artifacts_dir_name)
     loop = AgentLoop(
         planner=Planner(provider_client, settings.model),
         executor=executor,
@@ -172,6 +175,9 @@ def run(
     provider: str = typer.Option("lmstudio", help="Provider name"),
     model: str = typer.Option("qwen/qwen3-coder-30b", help="Model identifier"),
     workspace: Path = typer.Option(Path("."), help="Workspace path"),
+    isolated_workspace: bool = typer.Option(False, "--isolated-workspace", help="Run tools against a temporary copy instead of the live workspace"),
+    keep_isolated: bool = typer.Option(False, "--keep-isolated", help="Keep the temporary isolated workspace after the run"),
+    isolated_base_dir: Optional[Path] = typer.Option(None, "--isolated-base-dir", help="Parent directory for isolated workspace copies"),
     list_runs: bool = typer.Option(False, "--list-runs", help="List past recorded runs and exit"),
     replay_run: Optional[str] = typer.Option(None, "--replay-run", help="Replay a past run by run ID and exit"),
     runs_limit: int = typer.Option(20, "--runs-limit", help="Maximum number of past runs to show"),
@@ -190,17 +196,46 @@ def run(
     if not task:
         raise typer.BadParameter("--task is required unless --list-runs or --replay-run is used")
 
-    _, _, artifact_store, registry, loop = _build_runtime(settings)
-    plan, state, summary = loop.run(task)
-    _record_run(
-        registry,
-        artifact_store=artifact_store,
-        settings=settings,
-        task=task,
-        state=state,
-        summary=summary,
-    )
-    _print_run_output(plan, state, summary, artifact_store)
+    workspace_handle = WorkspaceManager(
+        settings.workspace,
+        enabled=isolated_workspace,
+        keep_isolated=keep_isolated,
+        base_dir=isolated_base_dir,
+    ).prepare()
+    try:
+        _, _, artifact_store, registry, loop = _build_runtime(
+            settings,
+            runtime_workspace=workspace_handle.root_path,
+            artifacts_workspace=settings.workspace,
+        )
+        plan, state, summary = loop.run(task)
+        if isolated_workspace:
+            state.notes.append(f"Workspace mode: {workspace_handle.mode}; root={workspace_handle.root_path}")
+            if keep_isolated:
+                summary.next_steps = [
+                    f"Review isolated workspace: {workspace_handle.root_path}",
+                    *summary.next_steps,
+                ]
+            else:
+                summary.next_steps = [
+                    "Run again with --keep-isolated if you want to inspect the temporary workspace after completion.",
+                    *summary.next_steps,
+                ]
+        _record_run(
+            registry,
+            artifact_store=artifact_store,
+            settings=settings,
+            task=task,
+            state=state,
+            summary=summary,
+        )
+        _print_run_output(plan, state, summary, artifact_store)
+        if isolated_workspace:
+            console.print(f"Workspace mode: isolated copy at {workspace_handle.root_path}")
+            if not keep_isolated:
+                console.print("Isolated workspace will be removed after this run. Use --keep-isolated to inspect it.")
+    finally:
+        workspace_handle.cleanup()
 
 
 if __name__ == "__main__":

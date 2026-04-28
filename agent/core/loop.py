@@ -100,7 +100,7 @@ class AgentLoop:
 
         try:
             project_summary = self.executor.validation.detect_project()
-            state.notes.append("Project profile:\n" . project_summary)
+            state.notes.append("Project profile:\n" + project_summary)
             self._log("project_detected", {"summary": project_summary})
         except Exception as exc:  # noqa: BLE001
             state.notes.append(f"Project profile unavailable: {type(exc).__name__}: {exc}")

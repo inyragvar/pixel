@@ -181,6 +181,7 @@ def run(
     list_runs: bool = typer.Option(False, "--list-runs", help="List past recorded runs and exit"),
     replay_run: Optional[str] = typer.Option(None, "--replay-run", help="Replay a past run by run ID and exit"),
     runs_limit: int = typer.Option(20, "--runs-limit", help="Maximum number of past runs to show"),
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON instead of Rich-formatted output for task runs"),
 ) -> None:
     settings = Settings(provider=provider, model=model, workspace=workspace.resolve())
     registry = RunRegistry(settings.workspace / settings.artifacts_dir_name)
@@ -229,11 +230,32 @@ def run(
             state=state,
             summary=summary,
         )
-        _print_run_output(plan, state, summary, artifact_store)
-        if isolated_workspace:
-            console.print(f"Workspace mode: isolated copy at {workspace_handle.root_path}")
-            if not keep_isolated:
-                console.print("Isolated workspace will be removed after this run. Use --keep-isolated to inspect it.")
+        if json_output:
+            payload = {
+                "run_id": artifact_store.run_id,
+                "artifact_dir": str(artifact_store.root),
+                "plan": plan.model_dump() if hasattr(plan, "model_dump") else plan,
+                "summary": summary.model_dump() if hasattr(summary, "model_dump") else summary,
+                "state": {
+                    "step_count": state.step_count,
+                    "finished": state.finished,
+                    "actions_taken": state.actions_taken,
+                    "changed_files": sorted(set(state.changed_files)),
+                    "commands_run": state.commands_run,
+                },
+                "workspace": {
+                    "mode": workspace_handle.mode,
+                    "root": str(workspace_handle.root_path),
+                    "kept": bool(isolated_workspace and keep_isolated),
+                },
+            }
+            console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            _print_run_output(plan, state, summary, artifact_store)
+            if isolated_workspace:
+                console.print(f"Workspace mode: isolated copy at {workspace_handle.root_path}")
+                if not keep_isolated:
+                    console.print("Isolated workspace will be removed after this run. Use --keep-isolated to inspect it.")
     finally:
         workspace_handle.cleanup()
 

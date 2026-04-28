@@ -39,31 +39,31 @@ Still missing for a solid v1:
 ## Phase 1 — harden the current loop
 
 ### 1. Provider-specific adapter split
-- [ ] split `OpenAICompatibleProvider` behavior into capability-aware paths
-- [ ] add explicit provider config for:
-  - [ ] LM Studio
-  - [ ] Ollama
-  - [ ] OpenAI cloud
-- [ ] define capability flags such as:
-  - [ ] supports_native_tools
-  - [ ] supports_json_schema
-  - [ ] supports_beta_parse
-  - [ ] supports_streaming
+- [x] split `OpenAICompatibleProvider` behavior into capability-aware paths
+- [x] add explicit provider config for:
+  - [x] LM Studio
+  - [x] Ollama
+  - [x] OpenAI cloud
+- [x] define capability flags such as:
+  - [x] supports_native_tools
+  - [x] supports_json_schema
+  - [x] supports_beta_parse
+  - [x] supports_streaming
 - [ ] handle provider-specific message/response quirks cleanly
 - [ ] add tests for each provider mode using fake clients
 
 ### 2. Action generation robustness
 - [ ] support malformed tool arguments more defensively
-- [ ] validate tool name against allowed tools before execution
+- [x] validate tool name against allowed tools before execution
 - [ ] add repair pass for invalid decisions
 - [ ] improve fallback prompting for weaker local models
-- [ ] log which provider fallback path was used during each decision
+- [x] log which provider fallback path was used during each decision
 
 ### 3. Better executor safety
-- [ ] reject unknown tool names before dispatch
-- [ ] validate required tool arguments before execution
-- [ ] limit file size for read/write operations
-- [ ] limit search result count and payload size
+- [x] reject unknown tool names before dispatch
+- [x] validate required tool arguments before execution
+- [x] limit file size for read/write operations
+- [x] limit search result count and payload size
 - [ ] normalize command output for easier review by the model
 
 ---
@@ -71,10 +71,10 @@ Still missing for a solid v1:
 ## Phase 2 — improve editing
 
 ### 4. Patch-first editing
-- [ ] add unified diff patch application tool
-- [ ] prefer patch application over full-file rewrite
-- [ ] keep `write_file` for new files or explicit full rewrites only
-- [ ] capture patch failures with precise error output
+- [x] add unified diff patch application tool
+- [x] prefer patch application over full-file rewrite
+- [x] keep `write_file` for new files or explicit full rewrites only
+- [x] capture patch failures with precise error output
 - [ ] add tests for patch application edge cases
 
 ### 5. Safer file operations
@@ -108,14 +108,14 @@ Still missing for a solid v1:
 ## Phase 4 — safer execution environment
 
 ### 9. Workspace isolation
-- [ ] create a per-task temp workspace or git worktree
-- [ ] support copying or cloning the target repo into a run directory
+- [x] create a per-task temp workspace or git worktree
+- [x] support copying or cloning the target repo into a run directory
 - [ ] keep artifacts per run:
-  - [ ] logs
-  - [ ] prompts
-  - [ ] tool calls
-  - [ ] diffs
-  - [ ] command outputs
+  - [x] logs
+  - [x] prompts
+  - [x] tool calls
+  - [x] diffs
+  - [x] command outputs
 
 ### 10. Sandbox
 - [ ] add Docker-based command runner
@@ -137,9 +137,9 @@ Still missing for a solid v1:
 
 ### 12. CLI improvements
 - [ ] richer run output formatting
-- [ ] `--json` mode for automation
+- [x] `--json` mode for automation
 - [ ] resume failed run by ID
-- [ ] show exact fallback mode used per decision
+- [x] show exact fallback mode used per decision
 - [ ] show step budget and token/debug stats
 
 ### 13. Logging and persistence
@@ -259,3 +259,22 @@ Recommended next MWP task:
 
 Next isolation improvement:
 - [ ] Add an explicit “copy changes back from isolated workspace” flow, or keep isolated mode as dry-run only.
+
+
+## MWP implementation progress — continued 2026-04-28
+
+Completed in this pass:
+- [x] Provider capability checks are now actually respected before native tool, JSON schema, and beta parse calls.
+- [x] Added provider fallback-mode logging for planning and each decision step.
+- [x] Added final git status and final git diff artifacts for every persisted run.
+- [x] Added CLI `--json` output mode for automation and editor/web UI integration.
+- [x] Hardened shell execution with extra blocked command patterns: `sudo`, `git push`, `git commit`, `curl|bash`, `wget|bash`, and destructive root/home deletes.
+- [x] Added tests for provider capability behavior, final git artifacts, JSON-safe shell execution, and dangerous command blocking.
+
+Validation:
+- [x] `python -m pytest -q` passes: 27 tests.
+
+Recommended next task:
+- [ ] Add approval gates for intentionally destructive operations and explicit `git commit`/`git push` workflows.
+- [ ] Add `--resume-run` or `--continue-run` for continuing from a stored artifact history.
+- [ ] Add a small benchmark/eval harness with reproducible development tasks.

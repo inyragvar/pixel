@@ -76,3 +76,35 @@ def test_decide_action_falls_back_to_json_in_text() -> None:
 
     assert decision.decision == "final"
     assert decision.summary == "done"
+
+
+def test_provider_honors_disabled_native_tools_and_uses_text_json_fallback() -> None:
+    from agent.providers.capabilities import ProviderCapabilities
+
+    message = SimpleNamespace(
+        content='{"decision":"final","summary":"done without tools","next_steps":[],"changed_files":[]}',
+        tool_calls=[_FakeToolCall("read_file", json.dumps({"path": "ignored.py"}))],
+    )
+    completion = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    provider = OpenAICompatibleProvider(
+        base_url="http://example.com/v1",
+        api_key="dummy",
+        client=_FakeClient(completion),
+        capabilities=ProviderCapabilities(
+            supports_native_tools=False,
+            supports_json_schema=False,
+            supports_beta_parse=False,
+        ),
+    )
+
+    decision = provider.decide_action(
+        system_prompt="act",
+        messages=[{"role": "user", "content": "task"}],
+        model="fake-model",
+        tools=[],
+        decision_schema=AgentDecision,
+    )
+
+    assert decision.decision == "final"
+    assert decision.summary == "done without tools"
+    assert provider.last_decision_mode == "text_json_fallback"

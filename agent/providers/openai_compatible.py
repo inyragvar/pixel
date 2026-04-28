@@ -25,7 +25,12 @@ class OpenAICompatibleProvider(Provider):
         capabilities: ProviderCapabilities | None = None,
     ) -> None:
         self.provider_name = provider_name
-        self.capabilities = capabilities or ProviderCapabilities()
+        self.capabilities = capabilities or ProviderCapabilities(
+            supports_native_tools=True,
+            supports_json_schema=True,
+            supports_beta_parse=False,
+            supports_streaming=True,
+        )
         self.base_url = base_url
         self.last_generate_mode = None
         self.last_decision_mode = None
@@ -50,23 +55,25 @@ class OpenAICompatibleProvider(Provider):
             self.last_generate_mode = "text"
             return self._generate_text(model=model, messages=input_messages)
 
-        parsed = self._try_beta_parse(
-            model=model,
-            messages=input_messages,
-            response_schema=response_schema,
-        )
-        if parsed is not None:
-            self.last_generate_mode = "beta_parse"
-            return parsed
+        if self.capabilities.supports_beta_parse:
+            parsed = self._try_beta_parse(
+                model=model,
+                messages=input_messages,
+                response_schema=response_schema,
+            )
+            if parsed is not None:
+                self.last_generate_mode = "beta_parse"
+                return parsed
 
-        parsed = self._try_json_schema_response_format(
-            model=model,
-            messages=input_messages,
-            response_schema=response_schema,
-        )
-        if parsed is not None:
-            self.last_generate_mode = "json_schema"
-            return parsed
+        if self.capabilities.supports_json_schema:
+            parsed = self._try_json_schema_response_format(
+                model=model,
+                messages=input_messages,
+                response_schema=response_schema,
+            )
+            if parsed is not None:
+                self.last_generate_mode = "json_schema"
+                return parsed
 
         raw_text = self._generate_text(
             model=model,
@@ -95,34 +102,36 @@ class OpenAICompatibleProvider(Provider):
     ) -> BaseModel:
         input_messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}, *messages]
 
-        native = self._try_native_tool_call(
-            model=model,
-            messages=input_messages,
-            tools=tools,
-            decision_schema=decision_schema,
-        )
-        if native is not None:
-            self.last_decision_mode = "native_tools"
-            return native
+        if self.capabilities.supports_native_tools:
+            native = self._try_native_tool_call(
+                model=model,
+                messages=input_messages,
+                tools=tools,
+                decision_schema=decision_schema,
+            )
+            if native is not None:
+                self.last_decision_mode = "native_tools"
+                return native
 
-        parsed = self._try_json_schema_response_format(
-            model=model,
-            messages=[
-                *input_messages,
-                {
-                    "role": "system",
-                    "content": (
-                        "Respond with a single JSON object only. "
-                        "Use decision='tool' with tool + args when you want to act, "
-                        "or decision='final' when done or blocked."
-                    ),
-                },
-            ],
-            response_schema=decision_schema,
-        )
-        if parsed is not None:
-            self.last_decision_mode = "json_schema"
-            return parsed
+        if self.capabilities.supports_json_schema:
+            parsed = self._try_json_schema_response_format(
+                model=model,
+                messages=[
+                    *input_messages,
+                    {
+                        "role": "system",
+                        "content": (
+                            "Respond with a single JSON object only. "
+                            "Use decision='tool' with tool + args when you want to act, "
+                            "or decision='final' when done or blocked."
+                        ),
+                    },
+                ],
+                response_schema=decision_schema,
+            )
+            if parsed is not None:
+                self.last_decision_mode = "json_schema"
+                return parsed
 
         fallback_prompt = (
             "Return valid JSON only. Choose exactly one next step. "

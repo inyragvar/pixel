@@ -42,6 +42,25 @@ class AgentLoop:
         if self.artifact_store is not None:
             self.artifact_store.append_event(event_type, payload)
 
+    def _provider_mode_snapshot(self) -> dict[str, str | None]:
+        return {
+            "generate_mode": getattr(self.provider, "last_generate_mode", None),
+            "decision_mode": getattr(self.provider, "last_decision_mode", None),
+        }
+
+    def _capture_final_workspace_state(self) -> None:
+        if self.artifact_store is None:
+            return
+        try:
+            status = self.executor.git.status()
+            diff = self.executor.git.diff()
+        except Exception as exc:  # noqa: BLE001
+            self._log("final_git_capture_error", {"error": f"{type(exc).__name__}: {exc}"})
+            return
+        self.artifact_store.write_text("outputs/final_git_status.txt", status + ("\n" if status else ""))
+        self.artifact_store.write_text("outputs/final_git_diff.patch", diff + ("\n" if diff else ""))
+        self._log("final_git_captured", {"status_preview": status[-2000:], "diff_bytes": len(diff.encode("utf-8"))})
+
     def _decide(self, state: AgentState) -> AgentDecision:
         tool_lines = "\n".join(f"- {tool}" for tool in self.executor.available_tools())
         user_prompt = (
@@ -106,6 +125,7 @@ class AgentLoop:
             state.notes.append(f"Project profile unavailable: {type(exc).__name__}: {exc}")
 
         plan = self.planner.create_plan(task)
+        self._log("provider_generate_mode", {"phase": "plan", **self._provider_mode_snapshot()})
         if self.artifact_store is not None:
             self.artifact_store.write_json("outputs/plan.json", plan)
             self._log("plan_created", plan)
@@ -118,6 +138,10 @@ class AgentLoop:
         for step_number in range(1, self.max_steps + 1):
             state.step_count = step_number
             decision = self._decide(state)
+            provider_modes = self._provider_mode_snapshot()
+            if provider_modes.get("decision_mode"):
+                state.notes.append(f"Step {step_number} provider decision mode: {provider_modes['decision_mode']}")
+            self._log("provider_decision_mode", {"step": step_number, **provider_modes})
             reasoning = decision.reasoning or ""
             if decision.decision == "final":
                 state.finished = True
@@ -197,6 +221,8 @@ class AgentLoop:
             final_answer.commands_run = state.commands_run
             self._log("final_from_reviewer", final_answer)
 
+        self._capture_final_workspace_state()
+
         if self.artifact_store is not None:
             self.artifact_store.write_json("outputs/final_summary.json", final_answer)
             self.artifact_store.write_json(
@@ -208,6 +234,7 @@ class AgentLoop:
                     "commands_run": state.commands_run,
                     "changed_files": sorted(set(state.changed_files)),
                     "finished": state.finished,
+                    "provider_modes": self._provider_mode_snapshot(),
                 },
             )
             self._log("run_finished", {"step_count": state.step_count, "finished": state.finished})

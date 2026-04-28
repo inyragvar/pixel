@@ -118,3 +118,44 @@ def test_executor_exposes_apply_patch(tmp_path: Path) -> None:
     )
 
     assert "apply_patch" in executor.available_tools()
+
+
+def test_agent_loop_writes_final_git_artifacts(tmp_path: Path) -> None:
+    from agent.artifacts import ArtifactStore
+
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    (workspace / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+    import subprocess
+
+    subprocess.run(["git", "init"], cwd=workspace, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=workspace, check=True)
+    subprocess.run(["git", "add", "main.py"], cwd=workspace, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=workspace, check=True, capture_output=True, text=True)
+
+    provider = FakeProvider()
+    artifact_store = ArtifactStore.create(tmp_path / "runs")
+    executor = Executor(
+        filesystem=FileSystemTool(workspace),
+        search=SearchTool(workspace),
+        shell=ShellTool(workspace),
+        git=GitTool(workspace),
+        validation=ValidationTool(workspace, ShellTool(workspace)),
+    )
+    loop = AgentLoop(
+        planner=Planner(provider, "fake-model"),
+        executor=executor,
+        reviewer=Reviewer(provider, "fake-model"),
+        provider=provider,
+        model="fake-model",
+        max_steps=5,
+        artifact_store=artifact_store,
+    )
+
+    loop.run("Update greeting")
+
+    assert (artifact_store.root / "outputs" / "final_git_status.txt").exists()
+    diff = (artifact_store.root / "outputs" / "final_git_diff.patch").read_text(encoding="utf-8")
+    assert "hello world" in diff

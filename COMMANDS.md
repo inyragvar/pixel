@@ -41,3 +41,28 @@ What not to ask it yet:
  - arbitrary dangerous shell operations
  - editor integration tasks
  - tasks requiring persistent run history or resume support
+## New useful commands
+
+Run with isolated workspace and keep the copy for manual inspection:
+
+```bash
+dev-agent --task "Make one safe improvement and run validation" --workspace . --isolated-workspace --keep-isolated
+```
+
+Print machine-readable JSON for automation:
+
+```bash
+dev-agent --task "Detect project type and run validation" --workspace . --json
+```
+
+Inspect final diff from a run:
+
+```bash
+cat .dev-agent/runs/<run-id>/outputs/final_git_diff.patch
+```
+
+Run validation through the agent itself:
+
+```bash
+dev-agent --task "Run project validation and explain failures if any" --workspace .
+```

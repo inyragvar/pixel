@@ -27,8 +27,9 @@ Implemented now:
   - file listing and file reading
   - file writing and appending
   - targeted in-file replacement
+  - unified-diff `apply_patch` edits
   - code search via `rg`
-  - safe shell command execution
+  - safer shell command execution with dangerous command blocking
   - git status and diff
 - CLI entrypoint
 - per-run artifact storage under `.dev-agent/runs/<run-id>/`
@@ -39,11 +40,9 @@ Implemented now:
 - test coverage for loop flow, filesystem, repo map, provider parsing, run registry, and project detection
 
 Not implemented yet:
-- unified-diff patch application
 - Docker sandbox / isolated task workspace
 - approval gates for dangerous actions
-- provider-specific capability flags
-- streaming / resumable runs
+- resumable runs
 - semantic code index / embeddings
 - GitHub / PR / issue tracker integrations
 
@@ -204,8 +203,52 @@ The current CLI flow returns:
 - recent agent history
 - run ID
 - artifact directory
+- optional machine-readable JSON via `--json`
 
 This is enough to support early debugging and iteration on the agent loop.
+
+
+### Safe isolated run
+
+Run tools against a temporary copy instead of the live repository:
+
+```bash
+dev-agent \
+  --task "Inspect this repo, make one safe improvement, and run validation" \
+  --workspace . \
+  --isolated-workspace \
+  --keep-isolated
+```
+
+Use this mode when testing weaker local models or when you want to inspect changes before copying them back manually.
+
+### Machine-readable run output
+
+```bash
+dev-agent \
+  --task "Detect this project and run validation" \
+  --workspace . \
+  --json
+```
+
+The JSON output includes the run ID, artifact directory, plan, final summary, changed files, commands run, and workspace mode.
+
+### Run artifacts
+
+Every normal run is saved under `.dev-agent/runs/<run-id>/` and includes:
+
+```text
+task.txt
+events.jsonl
+prompts/
+outputs/plan.json
+outputs/step_XX_tool.json
+outputs/step_XX_result.txt
+outputs/final_summary.json
+outputs/run_state.json
+outputs/final_git_status.txt
+outputs/final_git_diff.patch
+```
 
 ### Run history commands
 
